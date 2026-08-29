@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en" class="dark" dir="ltr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Harmony DocAI & RTL Knowledge Studio</title>
+  <meta name="description" content="iOS-styled Document & URL Knowledge Assistant with PDF, Word (DOCX/DOC), RTL multilingual intelligence, and Gemini AI.">
+  <meta property="og:title" content="Harmony DocAI & RTL Knowledge Studio">
+  <meta property="og:description" content="iOS-styled Document & URL Knowledge Assistant with PDF, Word (DOCX/DOC), RTL multilingual intelligence, and Gemini AI.">
+  
+  <!-- iOS PWA Meta Tags -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Harmony DocAI">
+  <meta name="theme-color" content="#007AFF">
+  <link rel="apple-touch-icon" href="https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f4d6.png">
+  <link rel="manifest" href="/manifest.json">
+
+  <!-- Typography: Apple SF Pro Look & Cairo/Tajawal for RTL Arabic -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
+  
+  <!-- Highlight.js Syntax Highlighting Theme -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['-apple-system', 'BlinkMacSystemFont', '"SF Pro Text"', '"SF Pro Display"', '"Plus Jakarta Sans"', 'Cairo', 'Tajawal', 'sans-serif'],
+            arabic: ['Cairo', 'Tajawal', 'sans-serif'],
+          },
+          colors: {
+            ios: {
+              blue: '#007AFF',
+              green: '#34C759',
+              indigo: '#5856D6',
+              orange: '#FF9500',
+              pink: '#FF2D55',
+              purple: '#AF52DE',
+              red: '#FF3B30',
+              teal: '#5AC8FA',
+              yellow: '#FFCC00',
+              gray: {
+                50: '#F2F2F7',
+                100: '#E5E5EA',
+                200: '#D1D1D6',
+                300: '#C7C7CC',
+                400: '#AEAEB2',
+                500: '#8E8E93',
+                600: '#636366',
+                700: '#48484A',
+                800: '#3A3A3C',
+                900: '#2C2C2E',
+                950: '#1C1C1E',
+                darkest: '#000000',
+              }
+            }
+          }
+        }
+      }
+    }
+  </script>
+  
+  <link rel="stylesheet" href="/index.css">
+</head>
+<body class="bg-black text-[#F2F2F7] antialiased selection:bg-[#007AFF]/30 selection:text-white overscroll-none select-none">
+  <div id="root"></div>
+  <script type="module" src="/index.tsx"></script>
+  
+  <!-- Register PWA Service Worker -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js')
+          .then((reg) => console.log('Harmony Service Worker registered', reg.scope))
+          .catch((err) => console.log('Service Worker registration skipped', err));
+      });
+    }
+  </script>
+</body>
+</html>

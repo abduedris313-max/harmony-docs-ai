@@ -1,0 +1,9 @@
+{
+  "name": "Harmony DocAI & RTL Knowledge Studio",
+  "description": "iOS-styled Document & URL Knowledge Assistant with PDF, Word (DOCX/DOC), RTL multilingual intelligence, and Gemini AI.",
+  "requestFramePermissions": [],
+  "prompt": "",
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
