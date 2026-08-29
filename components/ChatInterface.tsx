@@ -24,6 +24,7 @@ interface ChatInterfaceProps {
   soundEnabled: boolean;
   hapticsEnabled: boolean;
   onOpenDocsTab: () => void;
+  onReactToMessage?: (messageId: string, emoji: string) => void;
 }
 
 const ChatInterface: React.FC<ChatInterfaceProps> = ({
@@ -40,18 +41,45 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   soundEnabled,
   hapticsEnabled,
   onOpenDocsTab,
+  onReactToMessage,
 }) => {
   const [inputText, setInputText] = useState('');
   const [isListening, setIsListening] = useState(false);
+  const [showScrollButton, setShowScrollButton] = useState(false);
+  const [speechError, setSpeechError] = useState<string | null>(null);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const chatContainerRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<any>(null);
 
-  // Auto scroll to bottom
+  // Auto scroll to bottom when messages update or incoming response arrives
+  const scrollToBottom = (smooth = true) => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto' });
+    }
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+    }
+  };
+
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, isLoading]);
+    scrollToBottom(true);
+    const timer1 = setTimeout(() => scrollToBottom(true), 100);
+    const timer2 = setTimeout(() => scrollToBottom(true), 350);
+    return () => {
+      clearTimeout(timer1);
+      clearTimeout(timer2);
+    };
+  }, [messages, isLoading, messages.length, messages[messages.length - 1]?.text]);
+
+  const handleScroll = () => {
+    if (!chatContainerRef.current) return;
+    const { scrollTop, scrollHeight, clientHeight } = chatContainerRef.current;
+    const isNearBottom = scrollHeight - scrollTop - clientHeight < 120;
+    setShowScrollButton(!isNearBottom);
+  };
 
   // Adjust textarea height dynamically
   useEffect(() => {
@@ -67,17 +95,42 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
     if (SpeechRecognition) {
       const recognition = new SpeechRecognition();
       recognition.continuous = false;
-      recognition.interimResults = false;
-      recognition.lang = language === 'ar' ? 'ar-SA' : language === 'he' ? 'he-IL' : language === 'fa' ? 'fa-IR' : language === 'ur' ? 'ur-PK' : 'en-US';
+      recognition.interimResults = true;
+      recognition.lang =
+        language === 'ar'
+          ? 'ar-SA'
+          : language === 'he'
+          ? 'he-IL'
+          : language === 'fa'
+          ? 'fa-IR'
+          : language === 'ur'
+          ? 'ur-PK'
+          : language === 'es'
+          ? 'es-ES'
+          : language === 'fr'
+          ? 'fr-FR'
+          : 'en-US';
 
       recognition.onresult = (event: any) => {
-        const transcript = event.results[0][0].transcript;
-        setInputText((prev) => (prev ? `${prev} ${transcript}` : transcript));
-        setIsListening(false);
+        let transcript = '';
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          transcript += event.results[i][0].transcript;
+        }
+        if (transcript) {
+          setInputText((prev) => {
+            const trimmed = prev.trim();
+            return trimmed ? `${trimmed} ${transcript}` : transcript;
+          });
+        }
       };
 
-      recognition.onerror = () => {
+      recognition.onerror = (err: any) => {
+        console.warn('Speech recognition error:', err);
         setIsListening(false);
+        if (err.error !== 'no-speech') {
+          setSpeechError('Microphone access unavailable or quiet.');
+          setTimeout(() => setSpeechError(null), 3000);
+        }
       };
 
       recognition.onend = () => {
@@ -91,19 +144,28 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   const handleToggleVoice = () => {
     playIosClick(soundEnabled);
     triggerHaptic('medium', hapticsEnabled);
-    if (!recognitionRef.current) {
-      alert('Speech recognition is not supported in this browser environment.');
+    setSpeechError(null);
+
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      setSpeechError('Speech recognition is not supported in this browser.');
+      setTimeout(() => setSpeechError(null), 3500);
       return;
     }
 
     if (isListening) {
-      recognitionRef.current.stop();
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
       setIsListening(false);
     } else {
       try {
-        recognitionRef.current.start();
-        setIsListening(true);
+        if (recognitionRef.current) {
+          recognitionRef.current.start();
+          setIsListening(true);
+        }
       } catch (e) {
+        console.warn('Speech recognition restart issue:', e);
         setIsListening(false);
       }
     }
@@ -171,7 +233,11 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
       </div>
 
       {/* Messages Scroll Area */}
-      <div className="flex-grow p-3 sm:p-5 overflow-y-auto chat-container flex flex-col">
+      <div
+        ref={chatContainerRef}
+        onScroll={handleScroll}
+        className="flex-grow p-3 sm:p-5 overflow-y-auto chat-container flex flex-col relative"
+      >
         {messages.length === 0 ? (
           <div className="flex-grow flex flex-col items-center justify-center p-4 text-center max-w-md mx-auto my-auto animate-in fade-in duration-300">
             <div className="w-14 h-14 rounded-3xl bg-gradient-to-tr from-[#007AFF] to-[#5856D6] flex items-center justify-center text-white shadow-xl mb-4">
@@ -207,10 +273,23 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
               message={message}
               soundEnabled={soundEnabled}
               hapticsEnabled={hapticsEnabled}
+              onReact={onReactToMessage ? (emoji) => onReactToMessage(message.id, emoji) : undefined}
             />
           ))
         )}
         <div ref={messagesEndRef} />
+
+        {/* Scroll to Bottom Floating Button */}
+        {showScrollButton && (
+          <button
+            onClick={() => scrollToBottom(true)}
+            className="absolute bottom-4 right-4 z-20 w-9 h-9 rounded-full bg-[#007AFF] text-white shadow-2xl flex items-center justify-center hover:scale-110 active:scale-95 transition-all border border-white/20 animate-in fade-in duration-200"
+            title="Scroll to latest message"
+            aria-label="Scroll to latest message"
+          >
+            <ArrowUp size={16} className="rotate-180" />
+          </button>
+        )}
       </div>
 
       {/* Suggested Questions Strip */}
@@ -238,6 +317,30 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
               );
             })}
           </div>
+        </div>
+      )}
+
+      {/* Speech Dictation / Error Status Banner */}
+      {(isListening || speechError) && (
+        <div className="px-4 py-1.5 bg-[#1C1C1E] border-t border-white/10 flex items-center justify-between text-xs transition-all">
+          {isListening ? (
+            <div className="flex items-center gap-2 text-[#FF3B30] font-medium animate-pulse">
+              <Mic size={14} className="animate-bounce" />
+              <span>Voice dictation active... Listening to speech</span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 text-[#FF9500]">
+              <span>⚠️ {speechError}</span>
+            </div>
+          )}
+          {isListening && (
+            <button
+              onClick={handleToggleVoice}
+              className="text-[11px] text-[#8E8E93] hover:text-white underline"
+            >
+              Stop
+            </button>
+          )}
         </div>
       )}
 

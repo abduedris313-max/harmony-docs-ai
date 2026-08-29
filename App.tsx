@@ -13,7 +13,7 @@ import { sendChatMessage, fetchSmartSuggestions, parseUploadedFiles } from './se
 import { loadPersistedDocuments, persistDocuments, loadPersistedMessages, persistMessages } from './services/firebaseService';
 import { SAMPLE_DOCUMENTS } from './utils/sampleDocuments';
 import { isRTL, resolveDirection, SUPPORTED_LANGUAGES } from './utils/rtlUtils';
-import { playIosReceiveSound, triggerHaptic } from './utils/iosFeedback';
+import { playIosReceiveSound, playIosClick, triggerHaptic } from './utils/iosFeedback';
 
 const INITIAL_URL_GROUPS: URLGroup[] = [
   {
@@ -240,6 +240,24 @@ const App: React.FC = () => {
     }
   };
 
+  const handleReactToMessage = (messageId: string, emoji: string) => {
+    playIosClick(soundEnabled);
+    triggerHaptic('light', hapticsEnabled);
+    setMessages((prev) =>
+      prev.map((msg) => {
+        if (msg.id === messageId) {
+          const currentReactions = msg.reactions || [];
+          const exists = currentReactions.includes(emoji);
+          const updatedReactions = exists
+            ? currentReactions.filter((e) => e !== emoji)
+            : [...currentReactions, emoji];
+          return { ...msg, reactions: updatedReactions };
+        }
+        return msg;
+      })
+    );
+  };
+
   const handleExportChat = () => {
     if (messages.length === 0) {
       alert('No messages to export.');
@@ -299,6 +317,7 @@ const App: React.FC = () => {
             soundEnabled={soundEnabled}
             hapticsEnabled={hapticsEnabled}
             onOpenDocsTab={() => setActiveTab('docs')}
+            onReactToMessage={handleReactToMessage}
           />
         )}
 

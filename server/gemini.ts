@@ -7,8 +7,8 @@ import { GoogleGenAI, GenerateContentResponse, Tool, HarmCategory, HarmBlockThre
 import { isRTLText } from './docParser.js';
 
 // Primary and fallback models for high availability
-const PRIMARY_MODEL = 'gemini-3.7-flash';
-const FALLBACK_MODEL = 'gemini-2.5-flash';
+const PRIMARY_MODEL = 'gemini-2.5-flash';
+const FALLBACK_MODEL = 'gemini-3.7-flash';
 
 let aiInstance: GoogleGenAI | null = null;
 
@@ -64,14 +64,14 @@ async function callWithModelFallback<T>(
 
         if (is503orTransient && attempt < maxRetriesPerModel) {
           const delayMs = 300 * Math.pow(2, attempt) + Math.random() * 200;
-          console.warn(`[Gemini API] Transient error with model ${model} (attempt ${attempt + 1}/${maxRetriesPerModel + 1}). Retrying in ${Math.round(delayMs)}ms...`);
+          console.log(`[Gemini API] Retry attempt ${attempt + 1}/${maxRetriesPerModel + 1} for ${model} after ${Math.round(delayMs)}ms...`);
           await new Promise((resolve) => setTimeout(resolve, delayMs));
           continue;
         }
 
         // If it's a 503 / 429 on this model and we have another model candidate, break to next model
         if (is503orTransient && models.indexOf(model) < models.length - 1) {
-          console.warn(`[Gemini API] Model ${model} is experiencing high demand. Falling back to alternative model...`);
+          console.log(`[Gemini API] Model ${model} unavailable. Trying fallback model...`);
           break;
         }
 

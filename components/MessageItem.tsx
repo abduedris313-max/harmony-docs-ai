@@ -3,10 +3,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { marked } from 'marked';
 import hljs from 'highlight.js';
-import { Volume2, VolumeX, Copy, Check, FileText, Globe, Sparkles } from 'lucide-react';
+import { Volume2, VolumeX, Copy, Check, FileText, Globe, Sparkles, Smile, X } from 'lucide-react';
 import { ChatMessage, MessageSender } from '../types';
 import { isRTL } from '../utils/rtlUtils';
 import { speakText, stopSpeaking, triggerHaptic, playIosClick } from '../utils/iosFeedback';
@@ -19,21 +19,49 @@ marked.setOptions({
   langPrefix: 'hljs language-',
 } as any);
 
+const EMOJI_OPTIONS = ['👍', '❤️', '🔥', '👏', '⭐', '💡', '😂'];
+
 interface MessageItemProps {
   message: ChatMessage;
   soundEnabled: boolean;
   hapticsEnabled: boolean;
+  onReact?: (emoji: string) => void;
 }
 
-const MessageItem: React.FC<MessageItemProps> = ({ message, soundEnabled, hapticsEnabled }) => {
+const MessageItem: React.FC<MessageItemProps> = ({ message, soundEnabled, hapticsEnabled, onReact }) => {
   const [isCopied, setIsCopied] = useState(false);
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
+  const [showReactionMenu, setShowReactionMenu] = useState(false);
+  const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const isUser = message.sender === MessageSender.USER;
   const isModel = message.sender === MessageSender.MODEL;
   const isSystem = message.sender === MessageSender.SYSTEM;
 
   const messageIsRTL = message.isRTL ?? isRTL(message.text);
+
+  const startLongPress = () => {
+    if (message.isLoading) return;
+    longPressTimerRef.current = setTimeout(() => {
+      triggerHaptic('medium', hapticsEnabled);
+      playIosClick(soundEnabled);
+      setShowReactionMenu(true);
+    }, 450);
+  };
+
+  const cancelLongPress = () => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  };
+
+  const handleSelectEmoji = (emoji: string) => {
+    if (onReact) {
+      onReact(emoji);
+    }
+    setShowReactionMenu(false);
+  };
 
   const handleCopy = () => {
     navigator.clipboard.writeText(message.text);
@@ -90,7 +118,7 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, soundEnabled, haptic
 
   return (
     <div className={`flex w-full mb-3.5 ${isUser ? 'justify-end' : 'justify-start'}`}>
-      <div className={`max-w-[92%] sm:max-w-[80%] flex flex-col ${isUser ? 'items-end' : 'items-start'}`}>
+      <div className={`max-w-[92%] sm:max-w-[80%] flex flex-col relative ${isUser ? 'items-end' : 'items-start'}`}>
         
         {/* Sender Name / AI Tag */}
         {!isSystem && (
@@ -107,9 +135,47 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, soundEnabled, haptic
           </div>
         )}
 
+        {/* Emoji Reaction Popover Menu */}
+        {showReactionMenu && (
+          <div className={`absolute z-30 -top-10 ${isUser ? 'right-0' : 'left-0'} flex items-center gap-1 p-1.5 rounded-full bg-[#1C1C1E] border border-white/20 shadow-2xl animate-in fade-in zoom-in-95 duration-150`}>
+            {EMOJI_OPTIONS.map((emoji) => {
+              const isSelected = message.reactions?.includes(emoji);
+              return (
+                <button
+                  key={emoji}
+                  onClick={() => handleSelectEmoji(emoji)}
+                  className={`w-7 h-7 rounded-full flex items-center justify-center text-sm hover:scale-125 transition-transform ${
+                    isSelected ? 'bg-white/25 scale-110' : 'hover:bg-white/10'
+                  }`}
+                  title={`React ${emoji}`}
+                >
+                  {emoji}
+                </button>
+              );
+            })}
+            <button
+              onClick={() => setShowReactionMenu(false)}
+              className="p-1 rounded-full hover:bg-white/10 text-[#8E8E93] hover:text-white transition-colors"
+              title="Close menu"
+            >
+              <X size={12} />
+            </button>
+          </div>
+        )}
+
         {/* Message Bubble */}
         <div
-          className={`relative p-3.5 sm:p-4 rounded-3xl transition-all shadow-md ${
+          onTouchStart={startLongPress}
+          onTouchEnd={cancelLongPress}
+          onTouchMove={cancelLongPress}
+          onMouseDown={startLongPress}
+          onMouseUp={cancelLongPress}
+          onMouseLeave={cancelLongPress}
+          onContextMenu={(e) => {
+            e.preventDefault();
+            setShowReactionMenu(true);
+          }}
+          className={`relative p-3.5 sm:p-4 rounded-3xl transition-all shadow-md select-none ${
             isUser
               ? 'bg-[#007AFF] text-white rounded-br-md font-medium'
               : isModel
@@ -143,7 +209,23 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, soundEnabled, haptic
             </div>
           )}
 
-          {/* Action Bar for AI Message (Copy & Read Aloud) */}
+          {/* Reaction Pill Badges on Message */}
+          {message.reactions && message.reactions.length > 0 && (
+            <div className={`flex flex-wrap gap-1 mt-2.5 ${isUser ? 'justify-end' : 'justify-start'}`}>
+              {message.reactions.map((emoji) => (
+                <button
+                  key={emoji}
+                  onClick={() => onReact && onReact(emoji)}
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/15 hover:bg-white/25 text-xs text-white border border-white/10 transition-all shadow-sm"
+                  title="Toggle reaction"
+                >
+                  <span>{emoji}</span>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Action Bar for AI Message */}
           {isModel && !message.isLoading && (
             <div className="mt-2.5 pt-2 border-t border-white/5 flex items-center justify-between text-[#8E8E93]">
               <span className="text-[10px]">
@@ -151,6 +233,15 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, soundEnabled, haptic
               </span>
 
               <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setShowReactionMenu((prev) => !prev)}
+                  className="p-1 rounded-lg hover:bg-white/10 text-[#8E8E93] hover:text-white transition-colors"
+                  title="Add reaction"
+                  aria-label="Add emoji reaction"
+                >
+                  <Smile size={14} />
+                </button>
+
                 <button
                   onClick={handleToggleSpeech}
                   className={`p-1 rounded-lg hover:bg-white/10 transition-colors ${

@@ -48,6 +48,7 @@ export interface ChatMessage {
   urlContext?: UrlContextMetadataItem[];
   documentCitations?: DocumentCitationItem[];
   audioBase64?: string;
+  reactions?: string[];
 }
 
 export interface URLGroup {
