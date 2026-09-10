@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Paperclip, Mic, MicOff, Sparkles, FileText, Globe, RefreshCw, X, ArrowUp } from 'lucide-react';
+import { Send, Paperclip, Mic, MicOff, Sparkles, FileText, Globe, RefreshCw, X, ArrowUp, Search } from 'lucide-react';
 import { ChatMessage, KnowledgeDocument } from '../types';
 import MessageItem from './MessageItem';
 import { getTranslation, isRTL } from '../utils/rtlUtils';
@@ -47,6 +47,8 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   const [isListening, setIsListening] = useState(false);
   const [showScrollButton, setShowScrollButton] = useState(false);
   const [speechError, setSpeechError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
@@ -97,7 +99,9 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
       recognition.continuous = false;
       recognition.interimResults = true;
       recognition.lang =
-        language === 'ar'
+        language === 'am'
+          ? 'am-ET'
+          : language === 'ar'
           ? 'ar-SA'
           : language === 'he'
           ? 'he-IL'
@@ -191,6 +195,10 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
 
   const inputIsRTL = isRTL(inputText);
 
+  const filteredMessages = searchQuery.trim()
+    ? messages.filter((msg) => msg.text.toLowerCase().includes(searchQuery.trim().toLowerCase()))
+    : messages;
+
   return (
     <div className="flex flex-col h-full relative max-w-4xl mx-auto w-full">
       
@@ -220,17 +228,89 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
           </button>
         </div>
 
-        {suggestions.length > 0 && (
+        <div className="flex items-center gap-2">
+          {/* Search Toggle Button */}
           <button
-            onClick={onRefreshSuggestions}
-            className="flex items-center gap-1 text-[11px] text-[#8E8E93] hover:text-white transition-colors"
-            title="Refresh question suggestions"
+            onClick={() => {
+              playIosClick(soundEnabled);
+              triggerHaptic('light', hapticsEnabled);
+              setIsSearchOpen((prev) => !prev);
+            }}
+            className={`px-2 py-1 rounded-xl text-xs flex items-center gap-1 transition-all ${
+              isSearchOpen || searchQuery
+                ? 'bg-[#007AFF] text-white font-semibold shadow-md'
+                : 'text-[#8E8E93] hover:text-white hover:bg-white/10'
+            }`}
+            title="Search message history"
           >
-            <RefreshCw size={11} />
-            <span className="hidden sm:inline">Refresh prompts</span>
+            <Search size={13} />
+            <span className="hidden sm:inline">Search</span>
           </button>
-        )}
+
+          {suggestions.length > 0 && (
+            <button
+              onClick={onRefreshSuggestions}
+              className="flex items-center gap-1 text-[11px] text-[#8E8E93] hover:text-white transition-colors"
+              title="Refresh question suggestions"
+            >
+              <RefreshCw size={11} />
+              <span className="hidden sm:inline">Refresh prompts</span>
+            </button>
+          )}
+        </div>
       </div>
+
+      {/* Floating Interactive Search Bar */}
+      {(isSearchOpen || searchQuery) && (
+        <div className="px-3 py-2 bg-[#1C1C1E] border-b border-white/10 flex flex-col gap-1.5 animate-in slide-in-from-top duration-200 z-10 shadow-lg">
+          <div className="flex items-center gap-2">
+            <div className="relative flex-grow flex items-center">
+              <Search size={14} className="absolute left-3 text-[#8E8E93] pointer-events-none" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Filter chat history by keyword..."
+                className="w-full py-1.5 pl-8 pr-8 bg-[#2C2C2E] border border-white/15 text-white text-xs rounded-xl focus:outline-none focus:border-[#007AFF] placeholder-[#8E8E93]"
+                autoFocus
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-2.5 text-[#8E8E93] hover:text-white p-0.5"
+                  title="Clear search query"
+                >
+                  <X size={13} />
+                </button>
+              )}
+            </div>
+
+            <button
+              onClick={() => {
+                setSearchQuery('');
+                setIsSearchOpen(false);
+              }}
+              className="px-2.5 py-1.5 text-xs text-[#8E8E93] hover:text-white transition-colors font-medium"
+            >
+              Cancel
+            </button>
+          </div>
+
+          {searchQuery.trim() && (
+            <div className="flex items-center justify-between text-[11px] text-[#5AC8FA] px-1 font-medium">
+              <span>
+                Found {filteredMessages.length} {filteredMessages.length === 1 ? 'match' : 'matches'} for "{searchQuery}"
+              </span>
+              <button
+                onClick={() => setSearchQuery('')}
+                className="text-[#8E8E93] hover:text-white underline text-[10px]"
+              >
+                Reset Filter
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Messages Scroll Area */}
       <div
@@ -266,8 +346,22 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
               </div>
             )}
           </div>
+        ) : filteredMessages.length === 0 ? (
+          <div className="flex-grow flex flex-col items-center justify-center p-6 text-center text-[#8E8E93] my-auto">
+            <Search size={32} className="text-[#636366] mb-3" />
+            <p className="text-sm font-semibold text-white">No matching messages found</p>
+            <p className="text-xs text-[#8E8E93] mt-1 mb-4">
+              No message contains the keyword "{searchQuery}". Try searching for another term or clear the filter.
+            </p>
+            <button
+              onClick={() => setSearchQuery('')}
+              className="px-3.5 py-1.5 bg-[#007AFF] text-white text-xs font-semibold rounded-xl hover:bg-[#007AFF]/90 transition-all"
+            >
+              Clear Search Filter
+            </button>
+          </div>
         ) : (
-          messages.map((message) => (
+          filteredMessages.map((message) => (
             <MessageItem
               key={message.id}
               message={message}

@@ -4,61 +4,38 @@
  * Harmony DocAI Service Worker
  */
 
-const CACHE_NAME = 'harmony-docai-v1';
-const ASSETS_TO_CACHE = [
-  '/',
-  '/index.html',
-  '/manifest.json',
-  '/index.css',
-];
+const CACHE_NAME = 'harmony-docai-v2';
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(ASSETS_TO_CACHE);
-    }).then(() => self.skipWaiting())
-  );
+  self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) => {
-      return Promise.all(
-        keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))
-      );
+      return Promise.all(keys.map((key) => caches.delete(key)));
     }).then(() => self.clients.claim())
   );
 });
 
 self.addEventListener('fetch', (event) => {
-  // Let API requests bypass caching
-  if (event.request.url.includes('/api/')) {
+  const url = event.request.url;
+  // Always fetch fresh from network for API, Vite scripts, and development assets
+  if (
+    event.request.method !== 'GET' ||
+    url.includes('/api/') ||
+    url.includes('/@') ||
+    url.includes('.tsx') ||
+    url.includes('.ts') ||
+    url.includes('hot-update') ||
+    url.includes('vite')
+  ) {
     return;
   }
 
+  // Network first strategy with offline fallback
   event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
-      if (cachedResponse) {
-        return cachedResponse;
-      }
-      return fetch(event.request).then((networkResponse) => {
-        if (
-          !networkResponse ||
-          networkResponse.status !== 200 ||
-          networkResponse.type !== 'basic'
-        ) {
-          return networkResponse;
-        }
-
-        const responseToCache = networkResponse.clone();
-        caches.open(CACHE_NAME).then((cache) => {
-          cache.put(event.request, responseToCache);
-        });
-
-        return networkResponse;
-      }).catch(() => {
-        return caches.match('/index.html');
-      });
-    })
+    fetch(event.request).catch(() => caches.match(event.request))
   );
 });
+

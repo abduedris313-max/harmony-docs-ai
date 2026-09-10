@@ -3,11 +3,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React from 'react';
-import { Globe, Volume2, Smartphone, Download, Trash2, Shield, Info, Sparkles, Moon, Sun } from 'lucide-react';
+import React, { useState } from 'react';
+import { Globe, Volume2, Smartphone, Download, Trash2, Shield, Info, Sparkles, Moon, Sun, Database, User as UserIcon, LogIn, LogOut, CheckCircle2 } from 'lucide-react';
 import { AppDirection, AppTheme } from '../types';
 import { SUPPORTED_LANGUAGES, getTranslation } from '../utils/rtlUtils';
 import { playIosClick, triggerHaptic } from '../utils/iosFeedback';
+import { getFirebaseStatus, signInWithGoogle, logoutUser } from '../services/firebaseService';
+import type { User } from 'firebase/auth';
 
 interface SettingsSheetProps {
   language: string;
@@ -20,6 +22,7 @@ interface SettingsSheetProps {
   onToggleHaptics: () => void;
   onClearHistory: () => void;
   onExportChat: () => void;
+  currentUser?: User | null;
 }
 
 const SettingsSheet: React.FC<SettingsSheetProps> = ({
@@ -33,7 +36,39 @@ const SettingsSheet: React.FC<SettingsSheetProps> = ({
   onToggleHaptics,
   onClearHistory,
   onExportChat,
+  currentUser = null,
 }) => {
+  const [authLoading, setAuthLoading] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
+  const fbStatus = getFirebaseStatus();
+
+  const handleSignIn = async () => {
+    try {
+      setAuthLoading(true);
+      setAuthError(null);
+      playIosClick(soundEnabled);
+      triggerHaptic('light', hapticsEnabled);
+      await signInWithGoogle();
+    } catch (err: any) {
+      console.error('Sign in failed:', err);
+      setAuthError(err?.message || 'Authentication failed. Please check popup permissions.');
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const handleSignOut = async () => {
+    try {
+      setAuthLoading(true);
+      playIosClick(soundEnabled);
+      triggerHaptic('medium', hapticsEnabled);
+      await logoutUser();
+    } catch (err: any) {
+      console.error('Sign out failed:', err);
+    } finally {
+      setAuthLoading(false);
+    }
+  };
   return (
     <div className="h-full max-w-2xl mx-auto p-3 sm:p-5 flex flex-col gap-4 overflow-y-auto custom-scrollbar">
       
@@ -181,6 +216,86 @@ const SettingsSheet: React.FC<SettingsSheetProps> = ({
             <div className="w-11 h-6 bg-[#3A3A3C] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#34C759]"></div>
           </label>
         </div>
+      </div>
+
+      {/* Group: Firebase Cloud Ecosystem */}
+      <div className="ios-card rounded-3xl p-4 sm:p-5 shadow-xl border border-white/10 flex flex-col gap-3.5">
+        <div className="flex items-center justify-between">
+          <h3 className="text-xs font-bold text-[#8E8E93] uppercase tracking-wider px-1">
+            Firebase Cloud Backend
+          </h3>
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-[#34C759]/15 text-[#30D158] border border-[#34C759]/30">
+            <CheckCircle2 size={11} />
+            Connected
+          </span>
+        </div>
+
+        <div className="bg-[#2C2C2E]/60 rounded-2xl p-3 border border-white/5 flex flex-col gap-2">
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-[#8E8E93]">Cloud Project</span>
+            <span className="text-white font-mono font-medium">{fbStatus.projectId}</span>
+          </div>
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-[#8E8E93]">Auth Domain</span>
+            <span className="text-white font-mono font-medium truncate max-w-[180px] sm:max-w-none">{fbStatus.authDomain}</span>
+          </div>
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-[#8E8E93]">Persistence</span>
+            <span className="text-[#5AC8FA] font-medium">Cloud Firestore + Local Mirror</span>
+          </div>
+        </div>
+
+        {/* User Account / Auth Status */}
+        <div className="flex items-center justify-between pt-1">
+          <div className="flex items-center gap-3">
+            {currentUser?.photoURL ? (
+              <img
+                src={currentUser.photoURL}
+                alt={currentUser.displayName || 'User'}
+                className="w-10 h-10 rounded-full border border-white/20"
+                referrerPolicy="no-referrer"
+              />
+            ) : (
+              <div className="w-10 h-10 rounded-full bg-[#007AFF]/20 text-[#5AC8FA] flex items-center justify-center border border-[#007AFF]/30">
+                <UserIcon size={18} />
+              </div>
+            )}
+            <div>
+              <p className="text-sm font-semibold text-white">
+                {currentUser?.displayName || (currentUser ? 'Firebase User' : 'Guest Mode')}
+              </p>
+              <p className="text-[11px] text-[#8E8E93]">
+                {currentUser?.email || 'Cloud syncing active for current session'}
+              </p>
+            </div>
+          </div>
+
+          {currentUser ? (
+            <button
+              onClick={handleSignOut}
+              disabled={authLoading}
+              className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/15 border border-white/10 text-white text-xs font-semibold flex items-center gap-1.5 transition-all ios-press"
+            >
+              <LogOut size={13} />
+              <span>Sign Out</span>
+            </button>
+          ) : (
+            <button
+              onClick={handleSignIn}
+              disabled={authLoading}
+              className="px-3.5 py-1.5 rounded-xl bg-[#007AFF] hover:bg-[#007AFF]/90 text-white text-xs font-semibold flex items-center gap-1.5 transition-all shadow-md ios-press disabled:opacity-50"
+            >
+              <LogIn size={13} />
+              <span>{authLoading ? 'Signing In...' : 'Sign In'}</span>
+            </button>
+          )}
+        </div>
+
+        {authError && (
+          <div className="p-2.5 rounded-xl bg-[#FF3B30]/10 border border-[#FF3B30]/20 text-[#FF453A] text-xs">
+            {authError}
+          </div>
+        )}
       </div>
 
       {/* Group 3: Data Management & Actions */}

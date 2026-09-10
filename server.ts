@@ -9,7 +9,7 @@ import multer from 'multer';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { parsePdfBuffer, parseWordBuffer, parseTextBuffer } from './server/docParser.js';
-import { generateContent, getSmartSuggestions } from './server/gemini.js';
+import { generateContent, getSmartSuggestions, autoTagDocument } from './server/gemini.js';
 
 const app = express();
 const PORT = 3000;
@@ -59,6 +59,21 @@ app.post('/api/documents/parse', upload.array('files', 10), async (req, res) => 
         parsed = parseTextBuffer(file.buffer);
       }
 
+      // Auto-tag document using Gemini or fast heuristic fallback
+      let category = 'General';
+      let tags: string[] = [];
+      try {
+        const tagged = await autoTagDocument({
+          name: originalname,
+          content: parsed.text,
+          type: parsed.type,
+        });
+        category = tagged.category;
+        tags = tagged.tags;
+      } catch (tagErr) {
+        console.warn('Auto-tag error on upload:', tagErr);
+      }
+
       parsedResults.push({
         id: `doc-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
         name: originalname,
@@ -69,6 +84,8 @@ app.post('/api/documents/parse', upload.array('files', 10), async (req, res) => 
         pageCount: parsed.pageCount,
         isRTL: parsed.isRTL,
         base64Data: parsed.base64Data,
+        category,
+        tags,
         uploadedAt: Date.now(),
       });
     }
@@ -77,6 +94,27 @@ app.post('/api/documents/parse', upload.array('files', 10), async (req, res) => 
   } catch (error: any) {
     console.error('Error parsing documents:', error);
     return res.status(500).json({ error: error.message || 'Failed to parse uploaded document.' });
+  }
+});
+
+// Explicit auto-tag endpoint for documents
+app.post('/api/documents/tag', async (req, res) => {
+  try {
+    const { name, content, type } = req.body;
+    if (!name || typeof name !== 'string') {
+      return res.status(400).json({ error: 'Document name is required.' });
+    }
+
+    const tagged = await autoTagDocument({
+      name,
+      content: content || '',
+      type: type || 'text',
+    });
+
+    return res.json(tagged);
+  } catch (error: any) {
+    console.error('Auto-tag API Error:', error);
+    return res.status(500).json({ error: error.message || 'Failed to auto-tag document.' });
   }
 });
 

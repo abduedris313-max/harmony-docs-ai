@@ -28,6 +28,9 @@ jobs:
       - name: Typecheck TypeScript
         run: npx tsc --noEmit
 
+      - name: Run Vitest Unit Tests
+        run: npm run test
+
       - name: Build Application (Frontend & Server)
         env:
           NODE_ENV: production

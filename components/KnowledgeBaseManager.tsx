@@ -4,9 +4,9 @@
  */
 
 import React, { useState, useRef } from 'react';
-import { Plus, Trash2, ChevronDown, Upload, FileText, Globe, Eye, Sparkles, AlertCircle } from 'lucide-react';
+import { Plus, Trash2, ChevronDown, Upload, FileText, Globe, Eye, Sparkles, AlertCircle, Tag, Filter } from 'lucide-react';
 import { KnowledgeDocument, URLGroup } from '../types';
-import { parseUploadedFiles } from '../services/apiService';
+import { parseUploadedFiles, autoTagDocumentApi } from '../services/apiService';
 import { SAMPLE_DOCUMENTS } from '../utils/sampleDocuments';
 import { getTranslation, isRTL } from '../utils/rtlUtils';
 import { playIosClick, triggerHaptic } from '../utils/iosFeedback';
@@ -23,10 +23,32 @@ interface KnowledgeBaseManagerProps {
   documents: KnowledgeDocument[];
   onAddDocuments: (newDocs: KnowledgeDocument[]) => void;
   onRemoveDocument: (docId: string) => void;
+  onUpdateDocument?: (doc: KnowledgeDocument) => void;
   language: string;
   soundEnabled: boolean;
   hapticsEnabled: boolean;
 }
+
+const CATEGORY_LIST = ['All', 'Financial', 'Technical', 'Legal', 'Educational', 'Medical', 'Research', 'General'];
+
+const getCategoryBadgeClass = (category?: string) => {
+  switch (category) {
+    case 'Financial':
+      return 'bg-[#34C759]/20 text-[#30D158] border-[#34C759]/40';
+    case 'Technical':
+      return 'bg-[#007AFF]/20 text-[#5AC8FA] border-[#007AFF]/40';
+    case 'Legal':
+      return 'bg-[#AF52DE]/20 text-[#BF5AF2] border-[#AF52DE]/40';
+    case 'Educational':
+      return 'bg-[#FF9500]/20 text-[#FF9F0A] border-[#FF9500]/40';
+    case 'Medical':
+      return 'bg-[#FF2D55]/20 text-[#FF375F] border-[#FF2D55]/40';
+    case 'Research':
+      return 'bg-[#64D2FF]/20 text-[#64D2FF] border-[#64D2FF]/40';
+    default:
+      return 'bg-white/10 text-[#AEAEB2] border-white/20';
+  }
+};
 
 const KnowledgeBaseManager: React.FC<KnowledgeBaseManagerProps> = ({
   urls,
@@ -39,6 +61,7 @@ const KnowledgeBaseManager: React.FC<KnowledgeBaseManagerProps> = ({
   documents,
   onAddDocuments,
   onRemoveDocument,
+  onUpdateDocument,
   language,
   soundEnabled,
   hapticsEnabled,
@@ -49,6 +72,9 @@ const KnowledgeBaseManager: React.FC<KnowledgeBaseManagerProps> = ({
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [previewDoc, setPreviewDoc] = useState<KnowledgeDocument | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<string>('All');
+  const [taggingDocId, setTaggingDocId] = useState<string | null>(null);
+  const [isBatchTagging, setIsBatchTagging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const isValidUrl = (urlString: string): boolean => {
@@ -114,7 +140,70 @@ const KnowledgeBaseManager: React.FC<KnowledgeBaseManagerProps> = ({
     onAddDocuments(SAMPLE_DOCUMENTS);
   };
 
-  const activeGroupName = urlGroups.find((g) => g.id === activeUrlGroupId)?.name || 'Custom Group';
+  const handleAutoTagSingleDoc = async (doc: KnowledgeDocument) => {
+    playIosClick(soundEnabled);
+    triggerHaptic('medium', hapticsEnabled);
+    setTaggingDocId(doc.id);
+
+    try {
+      const result = await autoTagDocumentApi({
+        name: doc.name,
+        content: doc.content,
+        type: doc.type,
+      });
+
+      const updatedDoc: KnowledgeDocument = {
+        ...doc,
+        category: result.category,
+        tags: result.tags,
+      };
+
+      if (onUpdateDocument) {
+        onUpdateDocument(updatedDoc);
+      }
+      triggerHaptic('success', hapticsEnabled);
+    } catch (err) {
+      console.error('Failed to auto-tag document:', err);
+      triggerHaptic('error', hapticsEnabled);
+    } finally {
+      setTaggingDocId(null);
+    }
+  };
+
+  const handleBatchAutoTag = async () => {
+    if (documents.length === 0) return;
+    playIosClick(soundEnabled);
+    triggerHaptic('medium', hapticsEnabled);
+    setIsBatchTagging(true);
+
+    try {
+      for (const doc of documents) {
+        if (!doc.category || doc.category === 'General') {
+          const result = await autoTagDocumentApi({
+            name: doc.name,
+            content: doc.content,
+            type: doc.type,
+          });
+          if (onUpdateDocument) {
+            onUpdateDocument({
+              ...doc,
+              category: result.category,
+              tags: result.tags,
+            });
+          }
+        }
+      }
+      triggerHaptic('success', hapticsEnabled);
+    } catch (err) {
+      console.error('Batch tag error:', err);
+    } finally {
+      setIsBatchTagging(false);
+    }
+  };
+
+  const filteredDocuments = selectedCategory === 'All'
+    ? documents
+    : documents.filter((d) => (d.category || 'General') === selectedCategory);
 
   return (
     <div className="h-full flex flex-col gap-4 p-3 sm:p-5 max-w-4xl mx-auto overflow-y-auto custom-scrollbar">
@@ -131,7 +220,7 @@ const KnowledgeBaseManager: React.FC<KnowledgeBaseManagerProps> = ({
                 {getTranslation('uploadDocs', language)}
               </h2>
               <p className="text-[11px] text-[#8E8E93]">
-                Supports PDF (.pdf), Word (.docx, .doc), TXT & Markdown with RTL extraction
+                Supports PDF (.pdf), Word (.docx, .doc), TXT & Markdown with Gemini Auto-Tagging
               </p>
             </div>
           </div>
@@ -188,7 +277,7 @@ const KnowledgeBaseManager: React.FC<KnowledgeBaseManagerProps> = ({
               {isUploading ? getTranslation('readingDocument', language) : 'Tap to browse or drop PDF / Word files'}
             </p>
             <p className="text-[11px] text-[#8E8E93] mt-0.5">
-              Instant multimodal ingestion for Gemini 3.7
+              Automatic Gemini AI classification (Financial, Technical, Legal, etc.)
             </p>
           </div>
         </div>
@@ -200,65 +289,157 @@ const KnowledgeBaseManager: React.FC<KnowledgeBaseManagerProps> = ({
           </div>
         )}
 
-        {/* Uploaded Documents List */}
+        {/* Category Filter Pills & Auto-Tag Control Bar */}
         {documents.length > 0 && (
           <div className="space-y-2 mt-1">
-            <p className="text-xs font-semibold text-[#8E8E93] px-1">
-              Active Documents ({documents.length}):
-            </p>
-            <div className="space-y-1.5 max-h-56 overflow-y-auto custom-scrollbar">
-              {documents.map((doc) => {
-                const docIsRTL = doc.isRTL ?? isRTL(doc.content);
-                const isPdf = doc.type === 'pdf';
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-[#8E8E93]">
+                <Filter size={13} />
+                <span>Categories:</span>
+              </div>
 
+              <button
+                onClick={handleBatchAutoTag}
+                disabled={isBatchTagging}
+                className="px-2.5 py-1 rounded-xl bg-[#AF52DE]/20 hover:bg-[#AF52DE]/30 text-[#BF5AF2] border border-[#AF52DE]/40 text-xs font-semibold flex items-center gap-1 transition-all disabled:opacity-50"
+                title="Auto-classify untagged documents using Gemini"
+              >
+                {isBatchTagging ? (
+                  <div className="w-3 h-3 border-2 border-[#BF5AF2] border-t-transparent rounded-full animate-spin"></div>
+                ) : (
+                  <Sparkles size={12} />
+                )}
+                <span>Auto-Tag All with Gemini</span>
+              </button>
+            </div>
+
+            {/* Category Filter Chips */}
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 custom-scrollbar">
+              {CATEGORY_LIST.map((cat) => {
+                const count = cat === 'All'
+                  ? documents.length
+                  : documents.filter((d) => (d.category || 'General') === cat).length;
+
+                if (cat !== 'All' && count === 0) return null;
+
+                const isSelected = selectedCategory === cat;
                 return (
-                  <div
-                    key={doc.id}
-                    className="p-2.5 bg-[#2C2C2E]/70 border border-white/5 rounded-2xl flex items-center justify-between gap-3 hover:bg-[#3A3A3C]/70 transition-all"
+                  <button
+                    key={cat}
+                    onClick={() => {
+                      playIosClick(soundEnabled);
+                      setSelectedCategory(cat);
+                    }}
+                    className={`px-3 py-1 rounded-full text-xs font-medium transition-all whitespace-nowrap flex items-center gap-1.5 border ${
+                      isSelected
+                        ? 'bg-[#007AFF] text-white border-[#007AFF] shadow-md'
+                        : 'bg-[#2C2C2E] text-[#8E8E93] hover:text-white border-white/10 hover:border-white/20'
+                    }`}
                   >
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <span
-                        className={`px-2 py-0.5 rounded-lg text-[10px] font-bold uppercase tracking-wider border ${
-                          isPdf
-                            ? 'bg-[#FF3B30]/20 text-[#FF453A] border-[#FF3B30]/40'
-                            : 'bg-[#007AFF]/20 text-[#5AC8FA] border-[#007AFF]/40'
-                        }`}
-                      >
-                        {doc.type}
-                      </span>
-                      <div className="min-w-0">
-                        <p className="text-xs font-semibold text-white truncate" title={doc.name}>
-                          {doc.name}
-                        </p>
-                        <div className="flex items-center gap-2 text-[10px] text-[#8E8E93]">
-                          {doc.pageCount && <span>{doc.pageCount} pgs</span>}
-                          {doc.wordCount && <span>{doc.wordCount.toLocaleString()} {getTranslation('wordCount', language)}</span>}
-                          {docIsRTL && <span className="text-[#34C759] font-medium">🇸🇦 RTL</span>}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-1.5 flex-shrink-0">
-                      <button
-                        onClick={() => setPreviewDoc(doc)}
-                        className="p-1.5 text-[#AEAEB2] hover:text-white rounded-xl hover:bg-white/10 transition-colors"
-                        title="Preview extracted text"
-                        aria-label="Preview document text"
-                      >
-                        <Eye size={15} />
-                      </button>
-                      <button
-                        onClick={() => onRemoveDocument(doc.id)}
-                        className="p-1.5 text-[#AEAEB2] hover:text-[#FF453A] rounded-xl hover:bg-[#FF3B30]/10 transition-colors"
-                        title="Remove document"
-                        aria-label="Remove document"
-                      >
-                        <Trash2 size={15} />
-                      </button>
-                    </div>
-                  </div>
+                    <span>{cat}</span>
+                    <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${isSelected ? 'bg-white/25 text-white' : 'bg-white/10 text-[#8E8E93]'}`}>
+                      {count}
+                    </span>
+                  </button>
                 );
               })}
+            </div>
+
+            {/* Uploaded Documents List */}
+            <div className="space-y-1.5 max-h-64 overflow-y-auto custom-scrollbar pt-1">
+              {filteredDocuments.length === 0 ? (
+                <p className="text-xs text-[#8E8E93] text-center py-4">
+                  No documents found under '{selectedCategory}' category.
+                </p>
+              ) : (
+                filteredDocuments.map((doc) => {
+                  const docIsRTL = doc.isRTL ?? isRTL(doc.content);
+                  const isPdf = doc.type === 'pdf';
+                  const docCategory = doc.category || 'General';
+                  const isTaggingThis = taggingDocId === doc.id;
+
+                  return (
+                    <div
+                      key={doc.id}
+                      className="p-2.5 bg-[#2C2C2E]/70 border border-white/5 rounded-2xl flex items-center justify-between gap-3 hover:bg-[#3A3A3C]/70 transition-all"
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <span
+                          className={`px-2 py-0.5 rounded-lg text-[10px] font-bold uppercase tracking-wider border ${
+                            isPdf
+                              ? 'bg-[#FF3B30]/20 text-[#FF453A] border-[#FF3B30]/40'
+                              : 'bg-[#007AFF]/20 text-[#5AC8FA] border-[#007AFF]/40'
+                          }`}
+                        >
+                          {doc.type}
+                        </span>
+
+                        <div className="min-w-0 flex flex-col gap-0.5">
+                          <p className="text-xs font-semibold text-white truncate" title={doc.name}>
+                            {doc.name}
+                          </p>
+
+                          <div className="flex flex-wrap items-center gap-1.5 text-[10px] text-[#8E8E93]">
+                            {/* Gemini Category Badge */}
+                            <span className={`px-2 py-0.2 rounded-full font-bold border ${getCategoryBadgeClass(docCategory)}`}>
+                              {docCategory}
+                            </span>
+
+                            {/* Tags */}
+                            {doc.tags && doc.tags.length > 0 && (
+                              <div className="hidden sm:flex items-center gap-1">
+                                {doc.tags.map((tag) => (
+                                  <span key={tag} className="px-1.5 py-0.2 rounded-md bg-white/5 text-[#AEAEB2] border border-white/5">
+                                    #{tag}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+
+                            {doc.pageCount && <span>{doc.pageCount} pgs</span>}
+                            {doc.wordCount && <span>{doc.wordCount.toLocaleString()} {getTranslation('wordCount', language)}</span>}
+                            {docIsRTL && <span className="text-[#34C759] font-medium">🇸🇦 RTL</span>}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        {/* Auto-tag single document button */}
+                        <button
+                          onClick={() => handleAutoTagSingleDoc(doc)}
+                          disabled={isTaggingThis}
+                          className="p-1.5 text-[#BF5AF2] hover:text-white rounded-xl hover:bg-[#AF52DE]/20 transition-colors"
+                          title="Auto-Tag with Gemini AI"
+                          aria-label="Auto-tag document"
+                        >
+                          {isTaggingThis ? (
+                            <div className="w-3.5 h-3.5 border-2 border-[#BF5AF2] border-t-transparent rounded-full animate-spin"></div>
+                          ) : (
+                            <Tag size={15} />
+                          )}
+                        </button>
+
+                        <button
+                          onClick={() => setPreviewDoc(doc)}
+                          className="p-1.5 text-[#AEAEB2] hover:text-white rounded-xl hover:bg-white/10 transition-colors"
+                          title="Preview extracted text"
+                          aria-label="Preview document text"
+                        >
+                          <Eye size={15} />
+                        </button>
+                        <button
+                          onClick={() => onRemoveDocument(doc.id)}
+                          className="p-1.5 text-[#AEAEB2] hover:text-[#FF453A] rounded-xl hover:bg-[#FF3B30]/10 transition-colors"
+                          title="Remove document"
+                          aria-label="Remove document"
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
             </div>
           </div>
         )}

@@ -166,7 +166,12 @@ export function speakText(text: string, isRtlLang?: boolean, onEnd?: () => void)
   const utterance = new SpeechSynthesisUtterance(cleanText);
   currentUtterance = utterance;
 
-  if (isRtlLang) {
+  // Check if text is Amharic / Ethiopic script
+  const isAmharic = /[\u1200-\u137F]/.test(cleanText);
+
+  if (isAmharic) {
+    utterance.lang = 'am-ET';
+  } else if (isRtlLang) {
     utterance.lang = 'ar-SA';
   } else {
     utterance.lang = 'en-US';

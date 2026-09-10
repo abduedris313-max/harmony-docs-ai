@@ -23,6 +23,8 @@ export interface KnowledgeDocument {
   isRTL?: boolean;
   mimeType?: string;
   base64Data?: string; // For inline multimodal PDF
+  category?: string; // Auto-tagged category e.g., 'Financial', 'Technical', 'Legal', 'Educational'
+  tags?: string[]; // Category tags
   uploadedAt: number;
 }
 

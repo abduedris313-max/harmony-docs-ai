@@ -14,6 +14,8 @@ export const SAMPLE_DOCUMENTS: KnowledgeDocument[] = [
     wordCount: 1840,
     fileSize: 428000,
     isRTL: false,
+    category: 'Technical',
+    tags: ['Architecture', 'Gemini API', 'Multimodal'],
     uploadedAt: Date.now() - 3600000,
     content: `TECHNICAL SPECIFICATION: GEMINI 3.7 FLASH ARCHITECTURE & SYSTEM CAPABILITIES
 Author: Google DeepMind Research
@@ -48,6 +50,8 @@ Use the official @google/genai TypeScript SDK with server-side proxying and proc
     wordCount: 1220,
     fileSize: 315000,
     isRTL: true,
+    category: 'Educational',
+    tags: ['Arabic AI', 'RTL Guide', 'Multilingual'],
     uploadedAt: Date.now() - 7200000,
     content: `دليل الذكاء الاصطناعي التوليدي ونماذج اللغة المتقدمة باللغة العربية
 إعداد: قسم حلول الذكاء الاصطناعي والترجمة الآلية
@@ -80,6 +84,8 @@ Use the official @google/genai TypeScript SDK with server-side proxying and proc
     wordCount: 960,
     fileSize: 512000,
     isRTL: false,
+    category: 'Financial',
+    tags: ['Q3 Report', 'Revenue', 'Enterprise'],
     uploadedAt: Date.now() - 10800000,
     content: `GLOBAL ENTERPRISE GROUP - THIRD QUARTER FINANCIAL HIGHLIGHTS
 Fiscal Year Performance Review
@@ -101,5 +107,34 @@ Fiscal Year Performance Review
 
 4. GUIDANCE FOR Q4:
 Projected revenue target between $5.10B and $5.30B, reflecting high enterprise adoption of automated document intelligence workflows.`,
+  },
+  {
+    id: 'sample-doc-docx-amharic',
+    name: 'የአርቲፊሻል_ኢንቴሊጀንስ_እና_የሰነድ_ተንታኝ_መመሪያ.docx',
+    type: 'docx',
+    pageCount: 5,
+    wordCount: 880,
+    fileSize: 280000,
+    isRTL: false,
+    category: 'Educational',
+    tags: ['Amharic AI', 'DocAI', 'Ge\'ez Script'],
+    uploadedAt: Date.now() - 14400000,
+    content: `የአርቲፊሻል ኢንቴሊጀንስ እና የሰነድ መረጃ ትንተና መመሪያ (በአማርኛ)
+አዘጋጅ፡ የሃርሞኒ DocAI የቋንቋ እና የቴክኖሎጂ ክፍል
+
+መግቢያ፡
+የተፈጥሮ ቋንቋ ማቀናበር (NLP) በኢትዮጵያ ቋንቋዎች በተለይም በአማርኛ (የግዕዝ ፊደላት) ከፍተኛ እድገት እያሳየ ይገኛል። ይህ ሰነድ በPDF እና Word ፋይሎች ውስጥ ያሉ መረጃዎችን በGemini AI በመጠቀም እንዴት በቀላሉ ማውጣት እና መተንተን እንደሚቻል ያብራራል።
+
+ምዕራፍ 1፡ የግዕዝ ፊደላት እና የቋንቋ ትንተና
+1. የፊደላት ባህሪያት፡
+አማርኛ ከ300 በላይ የግዕዝ ፊደላትንና ምልክቶችን የሚጠቀም ሲሆን፣ Gemini 3.7 Flash ሞዴል እነዚህን ፊደላት ያለ ምንም ስህተት የማንበብ እና የመረዳት ብቃት አለው።
+
+2. የሰነዶች አውቶማቲክ ምደባ (Auto-Tagging)፡
+ሰነዶች ሲሰቀሉ በፋይናንስ፣ ቴክኖሎጂ፣ ሕግ፣ እና ትምህርት ዘርፍ በራሳቸው ይፈረጃሉ።
+
+ምዕራፍ 2፡ ዋና ዋና ጥቅሞች
+- የPDF እና Word ሰነዶችን በቅጽበት ማጠቃለል
+- በአማርኛ ቋንቋ ጥያቄዎችን መጠየቅ እና ትክክለኛ ምላሽ ማግኘት
+- የድምፅ ንባብ እና የድምፅ ትዕዛዞችን በሙሉ አቅም ማከናወን።`,
   },
 ];

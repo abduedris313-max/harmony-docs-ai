@@ -10,7 +10,8 @@ import ChatInterface from './components/ChatInterface';
 import KnowledgeBaseManager from './components/KnowledgeBaseManager';
 import SettingsSheet from './components/SettingsSheet';
 import { sendChatMessage, fetchSmartSuggestions, parseUploadedFiles } from './services/apiService';
-import { loadPersistedDocuments, persistDocuments, loadPersistedMessages, persistMessages } from './services/firebaseService';
+import { loadPersistedDocuments, persistDocuments, loadPersistedMessages, persistMessages, subscribeToAuth } from './services/firebaseService';
+import type { User } from 'firebase/auth';
 import { SAMPLE_DOCUMENTS } from './utils/sampleDocuments';
 import { isRTL, resolveDirection, SUPPORTED_LANGUAGES } from './utils/rtlUtils';
 import { playIosReceiveSound, playIosClick, triggerHaptic } from './utils/iosFeedback';
@@ -41,23 +42,65 @@ const App: React.FC = () => {
   
   // Documents & Chat State
   const [documents, setDocuments] = useState<KnowledgeDocument[]>(() => {
-    const loaded = loadPersistedDocuments('guest');
-    return loaded.length > 0 ? loaded : SAMPLE_DOCUMENTS.slice(0, 2);
+    try {
+      const loaded = loadPersistedDocuments('guest');
+      return Array.isArray(loaded) && loaded.length > 0 ? loaded : SAMPLE_DOCUMENTS.slice(0, 2);
+    } catch {
+      return SAMPLE_DOCUMENTS.slice(0, 2);
+    }
   });
   
   const [messages, setMessages] = useState<ChatMessage[]>(() => {
-    const loaded = loadPersistedMessages('guest');
-    return loaded.length > 0 ? loaded : [];
+    try {
+      const loaded = loadPersistedMessages('guest');
+      return Array.isArray(loaded) && loaded.length > 0 ? loaded : [];
+    } catch {
+      return [];
+    }
   });
 
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [suggestions, setSuggestions] = useState<string[]>([]);
   
   // App Settings
-  const [language, setLanguage] = useState<string>(() => localStorage.getItem('harmony_lang') || 'auto');
-  const [direction, setDirection] = useState<AppDirection>(() => (localStorage.getItem('harmony_dir') as AppDirection) || 'auto');
-  const [soundEnabled, setSoundEnabled] = useState<boolean>(() => localStorage.getItem('harmony_sound') !== 'false');
-  const [hapticsEnabled, setHapticsEnabled] = useState<boolean>(() => localStorage.getItem('harmony_haptics') !== 'false');
+  const [language, setLanguage] = useState<string>(() => {
+    try {
+      return localStorage.getItem('harmony_lang') || 'auto';
+    } catch {
+      return 'auto';
+    }
+  });
+  const [direction, setDirection] = useState<AppDirection>(() => {
+    try {
+      return (localStorage.getItem('harmony_dir') as AppDirection) || 'auto';
+    } catch {
+      return 'auto';
+    }
+  });
+  const [soundEnabled, setSoundEnabled] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('harmony_sound') !== 'false';
+    } catch {
+      return true;
+    }
+  });
+  const [hapticsEnabled, setHapticsEnabled] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('harmony_haptics') !== 'false';
+    } catch {
+      return true;
+    }
+  });
+
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+
+  // Subscribe to Firebase Auth
+  useEffect(() => {
+    const unsubscribe = subscribeToAuth((user) => {
+      setCurrentUser(user);
+    });
+    return () => unsubscribe();
+  }, []);
 
   const activeGroup = urlGroups.find((g) => g.id === activeUrlGroupId);
   const currentUrls = activeGroup ? activeGroup.urls : [];
@@ -71,14 +114,14 @@ const App: React.FC = () => {
     localStorage.setItem('harmony_dir', direction);
   }, [direction, language]);
 
-  // Persist documents & messages
+  // Persist documents & messages with user scope
   useEffect(() => {
-    persistDocuments('guest', documents);
-  }, [documents]);
+    persistDocuments(currentUser?.uid || 'guest', documents);
+  }, [documents, currentUser]);
 
   useEffect(() => {
-    persistMessages('guest', messages);
-  }, [messages]);
+    persistMessages(currentUser?.uid || 'guest', messages);
+  }, [messages, currentUser]);
 
   // Load Smart Suggestions
   const loadSuggestions = useCallback(async () => {
@@ -127,6 +170,10 @@ const App: React.FC = () => {
 
   const handleRemoveDocument = (docId: string) => {
     setDocuments((prev) => prev.filter((d) => d.id !== docId));
+  };
+
+  const handleUpdateDocument = (updatedDoc: KnowledgeDocument) => {
+    setDocuments((prev) => prev.map((d) => (d.id === updatedDoc.id ? updatedDoc : d)));
   };
 
   const handleUploadFromChat = async (files: FileList | null) => {
@@ -332,6 +379,7 @@ const App: React.FC = () => {
             documents={documents}
             onAddDocuments={handleAddDocuments}
             onRemoveDocument={handleRemoveDocument}
+            onUpdateDocument={handleUpdateDocument}
             language={language}
             soundEnabled={soundEnabled}
             hapticsEnabled={hapticsEnabled}
@@ -350,6 +398,7 @@ const App: React.FC = () => {
             onToggleHaptics={handleToggleHaptics}
             onClearHistory={handleClearHistory}
             onExportChat={handleExportChat}
+            currentUser={currentUser}
           />
         )}
       </main>

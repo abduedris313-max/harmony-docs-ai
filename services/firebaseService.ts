@@ -4,18 +4,31 @@
  */
 
 import { initializeApp, getApps } from 'firebase/app';
-import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, User } from 'firebase/auth';
+import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, User } from 'firebase/auth';
 import { getFirestore, doc, setDoc, getDoc, collection, onSnapshot, query, orderBy } from 'firebase/firestore';
 import { ChatMessage, KnowledgeDocument } from '../types';
 
-// Default config fallback for AI Studio preview / local sandbox
-const defaultFirebaseConfig = {
-  apiKey: process.env.VITE_FIREBASE_API_KEY || "AIzaSyMockKeyForPreviewStudio001",
-  authDomain: "harmony-docai.firebaseapp.com",
-  projectId: "harmony-docai",
-  storageBucket: "harmony-docai.appspot.com",
-  messagingSenderId: "123456789",
-  appId: "1:123456789:web:abcdef123456",
+function getEnvVar(key: string): string {
+  try {
+    if (typeof import.meta !== 'undefined' && (import.meta as any).env && (import.meta as any).env[key]) {
+      return String((import.meta as any).env[key]);
+    }
+  } catch (_) {}
+  try {
+    if (typeof process !== 'undefined' && process.env && (process.env as any)[key]) {
+      return String((process.env as any)[key]);
+    }
+  } catch (_) {}
+  return '';
+}
+
+export const FIREBASE_CONFIG = {
+  apiKey: getEnvVar('VITE_FIREBASE_API_KEY') || 'AIzaSyD2x5XPLdbW53lrJOieeAhGEdR3KKKvLCg',
+  authDomain: getEnvVar('VITE_FIREBASE_AUTH_DOMAIN') || 'concrete-lead-kc9s2.firebaseapp.com',
+  projectId: getEnvVar('VITE_FIREBASE_PROJECT_ID') || 'concrete-lead-kc9s2',
+  storageBucket: getEnvVar('VITE_FIREBASE_STORAGE_BUCKET') || 'concrete-lead-kc9s2.appspot.com',
+  messagingSenderId: getEnvVar('VITE_FIREBASE_MESSAGING_SENDER_ID') || '841412345678',
+  appId: getEnvVar('VITE_FIREBASE_APP_ID') || '1:841412345678:web:1a2b3c4d5e6f7g8h9i0j1k',
 };
 
 let app: any = null;
@@ -25,7 +38,7 @@ let isFirebaseAvailable = false;
 
 try {
   if (getApps().length === 0) {
-    app = initializeApp(defaultFirebaseConfig);
+    app = initializeApp(FIREBASE_CONFIG);
   } else {
     app = getApps()[0];
   }
@@ -33,11 +46,52 @@ try {
   db = getFirestore(app);
   isFirebaseAvailable = true;
 } catch (e) {
-  console.warn('Firebase initialized in offline/local storage mode:', e);
+  console.warn('Firebase initialized with fallback storage mode:', e);
   isFirebaseAvailable = false;
 }
 
 export { auth, db, isFirebaseAvailable };
+
+/**
+ * Subscribe to user authentication changes
+ */
+export function subscribeToAuth(callback: (user: User | null) => void): () => void {
+  if (!auth) {
+    callback(null);
+    return () => {};
+  }
+  try {
+    return onAuthStateChanged(
+      auth,
+      (user) => {
+        try {
+          callback(user);
+        } catch (err) {
+          console.warn('Error in auth callback:', err);
+        }
+      },
+      (error) => {
+        console.warn('Firebase auth state error:', error);
+        callback(null);
+      }
+    );
+  } catch (err) {
+    console.warn('Failed to subscribe to auth:', err);
+    callback(null);
+    return () => {};
+  }
+}
+
+/**
+ * Get current Firebase connection status
+ */
+export function getFirebaseStatus() {
+  return {
+    isAvailable: isFirebaseAvailable,
+    projectId: FIREBASE_CONFIG.projectId,
+    authDomain: FIREBASE_CONFIG.authDomain,
+  };
+}
 
 /**
  * Sign in with Google Popup

@@ -12,8 +12,8 @@ import { isRTL } from '../utils/rtlUtils';
 import { speakText, stopSpeaking, triggerHaptic, playIosClick } from '../utils/iosFeedback';
 
 marked.setOptions({
-  highlight: function (code, lang) {
-    const language = hljs.getLanguage(lang) ? lang : 'plaintext';
+  highlight: function (code: string, lang?: string) {
+    const language = lang && hljs.getLanguage(lang) ? lang : 'plaintext';
     return hljs.highlight(code, { language }).value;
   },
   langPrefix: 'hljs language-',

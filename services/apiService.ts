@@ -124,3 +124,25 @@ export async function parseUploadedFiles(files: File[]): Promise<KnowledgeDocume
   const data = await response.json();
   return data.documents as KnowledgeDocument[];
 }
+
+/**
+ * Requests auto-tagging for a document via Gemini.
+ */
+export async function autoTagDocumentApi(doc: { name: string; content: string; type: string }): Promise<{ category: string; tags: string[] }> {
+  const response = await fetch('/api/documents/tag', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      name: doc.name,
+      content: doc.content,
+      type: doc.type,
+    }),
+  });
+
+  if (!response.ok) {
+    const errData = await response.json().catch(() => ({ error: 'Auto-tag failed' }));
+    throw new Error(errData.error || 'Failed to auto-tag document');
+  }
+
+  return await response.json();
+}

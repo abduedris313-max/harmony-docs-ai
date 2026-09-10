@@ -24,63 +24,62 @@
   <!-- Highlight.js Syntax Highlighting Theme -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
   
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      darkMode: 'class',
-      theme: {
-        extend: {
-          fontFamily: {
-            sans: ['-apple-system', 'BlinkMacSystemFont', '"SF Pro Text"', '"SF Pro Display"', '"Plus Jakarta Sans"', 'Cairo', 'Tajawal', 'sans-serif'],
-            arabic: ['Cairo', 'Tajawal', 'sans-serif'],
-          },
-          colors: {
-            ios: {
-              blue: '#007AFF',
-              green: '#34C759',
-              indigo: '#5856D6',
-              orange: '#FF9500',
-              pink: '#FF2D55',
-              purple: '#AF52DE',
-              red: '#FF3B30',
-              teal: '#5AC8FA',
-              yellow: '#FFCC00',
-              gray: {
-                50: '#F2F2F7',
-                100: '#E5E5EA',
-                200: '#D1D1D6',
-                300: '#C7C7CC',
-                400: '#AEAEB2',
-                500: '#8E8E93',
-                600: '#636366',
-                700: '#48484A',
-                800: '#3A3A3C',
-                900: '#2C2C2E',
-                950: '#1C1C1E',
-                darkest: '#000000',
-              }
-            }
-          }
-        }
-      }
-    }
-  </script>
-  
   <link rel="stylesheet" href="/index.css">
+  
+  <style>
+    @keyframes ios-spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    .ios-preloader-spinner {
+      width: 32px;
+      height: 32px;
+      border: 3px solid rgba(255, 255, 255, 0.15);
+      border-top-color: #007AFF;
+      border-radius: 50%;
+      animation: ios-spin 0.8s cubic-bezier(0.4, 0.1, 0.2, 1) infinite;
+    }
+  </style>
+
+  <script>
+    // Unconditionally unregister any stale service workers and purge caches in preview/dev
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(function(regs) {
+        for (var i = 0; i < regs.length; i++) {
+          regs[i].unregister();
+        }
+      }).catch(function() {});
+    }
+    if ('caches' in window) {
+      caches.keys().then(function(keys) {
+        keys.forEach(function(k) { caches.delete(k); });
+      }).catch(function() {});
+    }
+
+    // Safety fallback: if app scripts fail to execute, display diagnostic details
+    window.addEventListener('error', function(e) {
+      var root = document.getElementById('root');
+      if (root && (!root.firstElementChild || root.querySelector('.ios-preloader'))) {
+        root.innerHTML = '<div style="display:flex;min-height:100vh;align-items:center;justify-content:center;padding:24px;background:#000000;color:#f2f2f7;font-family:-apple-system,sans-serif;">' +
+          '<div style="max-width:420px;width:100%;background:#1c1c1e;border:1px solid rgba(255,255,255,0.1);border-radius:24px;padding:28px;text-align:center;box-shadow:0 20px 40px rgba(0,0,0,0.5);">' +
+          '<div style="width:48px;height:48px;border-radius:14px;background:rgba(255,69,58,0.15);color:#ff453a;display:inline-flex;align-items:center;justify-content:center;font-size:24px;margin-bottom:16px;">⚠️</div>' +
+          '<h2 style="font-size:19px;font-weight:700;margin:0 0 8px;color:#fff;">Interface Loading Notice</h2>' +
+          '<p style="font-size:13px;color:#8e8e93;line-height:1.5;margin:0 0 16px;">An error occurred while launching Harmony DocAI scripts: ' + (e.message || 'Unknown error') + '</p>' +
+          '<button onclick="location.reload()" style="width:100%;padding:12px;background:#007aff;color:#fff;border:none;border-radius:12px;font-weight:600;font-size:14px;cursor:pointer;">Reload Workspace</button>' +
+          '</div></div>';
+      }
+    });
+  </script>
 </head>
 <body class="bg-black text-[#F2F2F7] antialiased selection:bg-[#007AFF]/30 selection:text-white overscroll-none select-none">
-  <div id="root"></div>
+  <div id="root">
+    <!-- Initial iOS loading state until React hydrates -->
+    <div class="ios-preloader" style="display:flex;flex-direction:column;min-height:100vh;align-items:center;justify-content:center;background:#000000;color:#F2F2F7;font-family:-apple-system,BlinkMacSystemFont,sans-serif;">
+      <div class="ios-preloader-spinner" style="margin-bottom:16px;"></div>
+      <div style="font-size:15px;font-weight:600;letter-spacing:-0.01em;color:#FFFFFF;">Harmony DocAI</div>
+      <div style="font-size:12px;color:#8E8E93;margin-top:4px;">Connecting workspace...</div>
+    </div>
+  </div>
   <script type="module" src="/index.tsx"></script>
-  
-  <!-- Register PWA Service Worker -->
-  <script>
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js')
-          .then((reg) => console.log('Harmony Service Worker registered', reg.scope))
-          .catch((err) => console.log('Service Worker registration skipped', err));
-      });
-    }
-  </script>
 </body>
 </html>

@@ -8,6 +8,7 @@ import { AppDirection, AppLanguage } from '../types';
 // Supported App Languages
 export const SUPPORTED_LANGUAGES: AppLanguage[] = [
   { code: 'auto', name: 'Auto Detect', nativeName: 'تلقائي / Auto', isRTL: false, flagEmoji: '🌐' },
+  { code: 'am', name: 'Amharic', nativeName: 'አማርኛ', isRTL: false, flagEmoji: '🇪🇹' },
   { code: 'ar', name: 'Arabic', nativeName: 'العربية', isRTL: true, flagEmoji: '🇸🇦' },
   { code: 'he', name: 'Hebrew', nativeName: 'עברית', isRTL: true, flagEmoji: '🇮🇱' },
   { code: 'fa', name: 'Persian (Farsi)', nativeName: 'فارسی', isRTL: true, flagEmoji: '🇮🇷' },
@@ -85,6 +86,38 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     clearChat: 'Clear Messages',
     addSamplePdf: 'Sample PDF (Gemini API Guide)',
     addSampleDocx: 'Sample Word (Arabic AI Overview)',
+  },
+  am: {
+    appTitle: 'ሃርሞኒ DocAI',
+    appSubtitle: 'ለPDF፣ Word እና ድረ-ገጾች የiOS እውቀት ረዳት',
+    chatTab: 'ውይይት',
+    docsTab: 'ሰነዶች እና ሊንኮች',
+    settingsTab: 'ቅንብሮች',
+    searchPlaceholder: 'ስለ PDF፣ Word ወይም ድረ-ገጽ ሰነዶችዎ ማንኛውንም ጥያቄ ይጠይቁ...',
+    uploadDocs: 'PDF / Word ስቀል',
+    addUrl: 'ሊንክ ጨምር',
+    activeGroup: 'ንቁ ምንጭ ስብስብ',
+    suggestionsTitle: 'የተጠቆሙ ጥያቄዎች',
+    noDocsYet: 'እስካሁን ምንም ሰነድ አልተሰቀለም። ለመወያየት PDF ወይም Word ፋይል ይሰቅሉ!',
+    noUrlsYet: 'በዚህ ቡድን ውስጥ ምንም ሊንክ አልተጨመረም።',
+    readingDocument: 'የሰነዱን ይዘት በመተንተን ላይ...',
+    thinking: 'እውቀትን በማቀናጀት ላይ...',
+    copySuccess: 'ወደ ቅንጥብ ሰሌዳ ተቀድቷል',
+    listen: 'በድምፅ አንብብ',
+    stopAudio: 'ንባብ አቁም',
+    wordCount: 'ቃላት',
+    pages: 'ገጾች',
+    detectedRtl: 'RTL ጽሑፍ',
+    detectedLtr: 'LTR ጽሑፍ',
+    rtlMode: 'ከቀኝ-ወደ-ግራ (RTL) አቀማመጥ',
+    language: 'ቋንቋ',
+    soundEffects: 'የiOS ድምፅ ውጤቶች',
+    haptics: 'የንክኪ ምላሽ (Haptics)',
+    sampleDocs: 'ናሙና ሰነዶችን ጫን',
+    exportChat: 'ውይይቱን ላክ',
+    clearChat: 'መልዕክቶችን አጽዳ',
+    addSamplePdf: 'ናሙና PDF (የGemini መመሪያ)',
+    addSampleDocx: 'ናሙና Word (የአማርኛ መግለጫ)',
   },
   ar: {
     appTitle: 'هارموني دوك الذكي',
@@ -284,3 +317,11 @@ export function getTranslation(key: string, langCode: string = 'en'): string {
   const dict = TRANSLATIONS[langCode] || TRANSLATIONS.en;
   return dict[key] || TRANSLATIONS.en[key] || key;
 }
+
+/**
+ * Convenient translation helper: t(lang, key)
+ */
+export function t(langCode: string, key: string): string {
+  return getTranslation(key, langCode);
+}
+

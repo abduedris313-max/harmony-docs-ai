@@ -125,6 +125,8 @@ Formatting Rules:
 
   if (promptIsRTL || language === 'ar' || language === 'he' || language === 'fa' || language === 'ur') {
     systemInstruction += `\nNote: The user prefers Right-to-Left (RTL) output. Structure your Arabic/Hebrew/Persian/Urdu phrasing smoothly and accurately.`;
+  } else if (language === 'am') {
+    systemInstruction += `\nNote: The user prefers responses in Amharic (አማርኛ). Write your response clearly and naturally in Amharic using Ge'ez (Ethiopic) script.`;
   }
 
   // Include previous conversation history context if available
@@ -344,3 +346,74 @@ Return ONLY a valid JSON object matching this schema:
     suggestions: buildDeterministicSuggestions(options),
   };
 }
+
+/**
+ * Auto-tags an uploaded document using Gemini or fallback heuristics.
+ */
+export async function autoTagDocument(doc: { name: string; content: string; type: string }): Promise<{ category: string; tags: string[] }> {
+  const nameLower = doc.name.toLowerCase();
+  const contentExcerpt = (doc.content || '').slice(0, 2500).toLowerCase();
+
+  // Fast heuristic fallback category assignment
+  let fallbackCategory = 'General';
+  if (/financial|revenue|quarter|fiscal|budget|balance|tax|q1|q2|q3|q4|profit|invest|earnings|cost|مالي|تقرير مالي|إيرادات|أرباح|ميزانية|ፋይናንስ|ባጀት|ገቢ/.test(nameLower + contentExcerpt)) {
+    fallbackCategory = 'Financial';
+  } else if (/technical|architecture|api|sdk|code|spec|model|developer|system|git|database|server|software|تقني|برمجة|الذكاء الاصطناعي|خوارزمية|نظام|ቴክኖሎጂ|ሶፍትዌር|ሲስተም/.test(nameLower + contentExcerpt)) {
+    fallbackCategory = 'Technical';
+  } else if (/legal|agreement|contract|terms|policy|privacy|license|compliance|attorney|clause|قانوني|عقد|اتفاقية|شروط|سياسة|ሕግ|ውል|ሕጋዊ/.test(nameLower + contentExcerpt)) {
+    fallbackCategory = 'Legal';
+  } else if (/guide|tutorial|course|educational|manual|handbook|study|curriculum|deli|دليل|تعليمي|شرح|منهج|تعليم|ትምህርት|መመሪያ|ትምህርታዊ/.test(nameLower + contentExcerpt)) {
+    fallbackCategory = 'Educational';
+  } else if (/medical|health|patient|clinical|trial|pharma|doctor|hospital|طبي|صحة|علاج|مستشفى|ሕክምና|ጤና|ህክምና/.test(nameLower + contentExcerpt)) {
+    fallbackCategory = 'Medical';
+  } else if (/research|paper|study|journal|survey|analysis|methodology|بحث|دراسة|علمي|تحليل|ምርምር|ጥናት|ትንተና/.test(nameLower + contentExcerpt)) {
+    fallbackCategory = 'Research';
+  }
+
+  const promptText = `Analyze the following document title and content excerpt. Select the SINGLE most accurate primary category from this exact list:
+["Financial", "Technical", "Legal", "Educational", "Medical", "Research", "General"]
+
+Also provide 2 to 4 short descriptive keyword tags (e.g., ["Quarterly Report", "Revenue"] or ["Gemini API", "Architecture"]).
+
+Document Title: "${doc.name}"
+Document Type: ${doc.type}
+Content Excerpt:
+${doc.content.slice(0, 3000)}
+
+Return ONLY a valid JSON object matching this exact schema:
+{
+  "category": "CategoryFromList",
+  "tags": ["Tag1", "Tag2", "Tag3"]
+}`;
+
+  try {
+    const ai = getAi();
+    const response: GenerateContentResponse = await callWithModelFallback(async (modelName) => {
+      return await ai.models.generateContent({
+        model: modelName,
+        contents: [{ role: 'user', parts: [{ text: promptText }] }],
+        config: {
+          safetySettings,
+          responseMimeType: 'application/json',
+        },
+      });
+    });
+
+    const raw = response.text?.trim() || '{}';
+    const parsed = JSON.parse(raw);
+    const validCategories = ['Financial', 'Technical', 'Legal', 'Educational', 'Medical', 'Research', 'General'];
+    const category = validCategories.includes(parsed.category) ? parsed.category : fallbackCategory;
+    const tags = Array.isArray(parsed.tags) && parsed.tags.length > 0
+      ? parsed.tags.filter((t: any) => typeof t === 'string' && t.trim()).slice(0, 4)
+      : [category, doc.type.toUpperCase()];
+
+    return { category, tags };
+  } catch (err) {
+    console.warn('[Gemini AutoTag] Model unavailable or rate limited, using heuristic classification:', err);
+    return {
+      category: fallbackCategory,
+      tags: [fallbackCategory, doc.type.toUpperCase()],
+    };
+  }
+}
+

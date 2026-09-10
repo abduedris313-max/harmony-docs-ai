@@ -28,7 +28,7 @@ const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({ document, o
   const handleDownloadText = () => {
     const blob = new Blob([document.content], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
+    const link = window.document.createElement('a');
     link.href = url;
     link.download = `${document.name.replace(/\.[^/.]+$/, '')}_extracted.txt`;
     link.click();
